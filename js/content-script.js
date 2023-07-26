@@ -95,7 +95,8 @@ const init = () => {
     }, 600)
   })
 
-  $('body').on('click', '.j-btn-down', function () {
+  $('body').on('click', '.j-btn-down', function (event) {
+    event.preventDefault()
     const tag = $(this).attr('data-tag')
     const code = `import { axios } from '@/utils/request'\n` + apiList.filter(item => item.tag === tag).map(item => item.code).join('')
     funDownload(code, tag + '.js')
