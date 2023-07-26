@@ -64,7 +64,7 @@ export const ${method}${apiName} = data => {
       res.tags.forEach(item => {
         const id = 'operations-tag-' + item.name
 
-        $('#' + id).prepend('<button style="width: 100px;" class="j-btn-down" type="button" data-tag="' + item.name +'">下载</button>')
+        $('#' + id).parents('.opblock-tag-section').prepend('<button style="width: 100px;" class="j-btn-down" type="button" data-tag="' + item.name +'">下载</button>')
       })
     })
 
