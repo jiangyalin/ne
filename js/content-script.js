@@ -45,7 +45,7 @@ const start = () => {
 export const ${method}${apiName} = data => {
   return axios({
     url: '${key}',
-    method: ${method},
+    method: '${method}',
     data
   })
 }
