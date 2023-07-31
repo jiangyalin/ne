@@ -32,7 +32,7 @@ const start = () => {
     if (!document.querySelector('#select')) return false
     clearInterval(interval)
     const url = document.querySelector('#select').value
-    $.get('http://192.168.3.104:9001' + url, res => {
+    $.get(window.location.origin + url, res => {
       for (const key in res.paths) {
         for (const method in res.paths[key]) {
           const item = res.paths[key][method]
