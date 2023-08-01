@@ -25,7 +25,7 @@ const funDownload = (content, filename) => {
 
 const capitalizeFirstLetter = (str = '') => str.charAt(0).toUpperCase() + str.slice(1)
 
-const apiList = []
+let apiList = []
 
 const start = () => {
   const interval = setInterval(() => {
@@ -33,6 +33,7 @@ const start = () => {
     clearInterval(interval)
     const url = document.querySelector('#select').value
     $.get(window.location.origin + url, res => {
+      apiList = []
       for (const key in res.paths) {
         for (const method in res.paths[key]) {
           const item = res.paths[key][method]
