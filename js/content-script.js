@@ -70,7 +70,7 @@ const getParameter = (data, schemas) => {
 
   if (data.parameters) {
     data.parameters.filter(item => item.in !== 'header').forEach(item => {
-      console.log('item', item)
+      // console.log('item', item)
       requestBodyArr.push(`  ${item.name}: ${typeToDefaults[item.schema.type]}, // ${item.description}`)
     })
   }
@@ -105,7 +105,7 @@ const getParameterV2 = (data, schemas) => {
 
 let apiList = []
 
-let stencil = `/**
+const defaultConfig = `/**
  * @description <summary>
  * @param {Object} data 请求参数
  * @returns {Promise} ajax
@@ -117,8 +117,12 @@ export const <method><apiName> = data => {
     data
   })
 }`
+const defaultHeadConfig = `import { axios } from '@/utils/request'`
+const defaultFooterConfig = ``
 
 let configMap = {}
+let headConfigMap = {}
+let footerConfigMap = {}
 
 const start = () => {
   const isSwaggerV1_0_0 = Boolean(document.querySelector('#swagger-ui'))
@@ -156,8 +160,9 @@ const start = () => {
 
           const request = requestBody
 
-          const code = (configMap[window.location.host] || stencil).replace(/<summary>/g, summary)
+          const code = (configMap[window.location.host] || defaultConfig).replace(/<summary>/g, summary)
             .replace(/<method>/g, method)
+            .replace(/<METHOD>/g, method.toUpperCase())
             .replace(/<apiName>/g, apiName)
             .replace(/<path>/g, path)
             .replace(/<request>/g, request)
@@ -219,6 +224,12 @@ const init = () => {
   chrome.storage.local.get('configMap', res => {
     configMap = res.configMap || {}
   })
+  chrome.storage.local.get('headConfigMap', res => {
+    headConfigMap = res.headConfigMap || {}
+  })
+  chrome.storage.local.get('footerConfigMap', res => {
+    footerConfigMap = res.footerConfigMap || {}
+  })
   start()
 
   // 只在isSwaggerV1_0_0生效
@@ -259,7 +270,7 @@ const init = () => {
   $('body').on('click', '.j-btn-down', function (event) {
     event.preventDefault()
     const tag = $(this).attr('data-tag')
-    const code = `import { axios } from '@/utils/request'\n` + apiList.filter(item => item.tag === tag).map(item => item.code).join('\n\n')
+    const code = (headConfigMap[window.location.host] || defaultHeadConfig) + '\n' + apiList.filter(item => item.tag === tag).map(item => item.code).join('\n\n') + '\n\n' + (footerConfigMap[window.location.host] || defaultFooterConfig)
     funDownload(code, tag + '.js')
   })
   

@@ -10,14 +10,18 @@
   body {
     padding: 10px;
     width: 300px;
-    height: 500px;
+    height: 600px;
     line-height: 1.8;
     box-sizing: border-box;
   }
 
   .u-config {
     width: 100%;
-    height: 200px;
+    height: 170px;
+  }
+
+  .u-config.s-mini {
+    height: 60px;
   }
 
   .u-btn-gp {
@@ -34,7 +38,7 @@
 
 <div>
   <p>api方法名 &lt;apiName&gt;</p>
-  <p>请求类型 &lt;method&gt;</p>
+  <p>请求类型 &lt;method&gt;(&lt;METHOD&gt;)</p>
   <p>接口地址 &lt;path&gt;</p>
   <p>接口描述 &lt;summary&gt;</p>
   <p>请求参数 &lt;request&gt;</p>
@@ -44,6 +48,10 @@
 <label for="config">配置</label>
 <p>当前配置会应用到<span class="j-name"></span></p>
 <textarea class="u-config j-config" name="config" id="config"></textarea>
+<label for="config">头部附加</label>
+<textarea class="u-config s-mini j-head-config" name="headConfig" id="headConfig"></textarea>
+<label for="config">尾部附加</label>
+<textarea class="u-config s-mini j-footer-config" name="footerConfig" id="footerConfig"></textarea>
 <div class="u-btn-gp">
   <button class="m-config-save j-config-save" type="button">保存</button>
   <button class="m-reset j-reset" type="button">重置</button>

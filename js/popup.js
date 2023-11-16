@@ -10,6 +10,9 @@ export const <method><apiName> = data => {
     data
   })
 }`
+const defaultHeadConfig = `import { axios } from '@/utils/request'`
+const defaultFooterConfig = ``
+
 let url = ''
 
 // 保存
@@ -18,6 +21,16 @@ $('.j-config-save').click(function () {
     const configMap = res.configMap || {}
     configMap[url] = $('.j-config').val()
     chrome.storage.local.set({ configMap: configMap })
+  })
+  chrome.storage.local.get('headConfigMap', res => {
+    const headConfigMap = res.headConfigMap || {}
+    headConfigMap[url] = $('.j-head-config').val()
+    chrome.storage.local.set({ headConfigMap: headConfigMap })
+  })
+  chrome.storage.local.get('footerConfigMap', res => {
+    const footerConfigMap = res.footerConfigMap || {}
+    footerConfigMap[url] = $('.j-footer-config').val()
+    chrome.storage.local.set({ footerConfigMap: footerConfigMap })
     $(this).text('ok')
     setTimeout(() => {
       $(this).text('保存')
@@ -54,8 +67,18 @@ const init = () => {
           const config = (res.configMap || {})[url] || defaultConfig
           $('.j-config').val(config)
         })
+        chrome.storage.local.get('headConfigMap', res => {
+          const config = (res.headConfigMap || {})[url] || defaultHeadConfig
+          $('.j-head-config').val(config)
+        })
+        chrome.storage.local.get('footerConfigMap', res => {
+          const config = (res.footerConfigMap || {})[url] || defaultFooterConfig
+          $('.j-footer-config').val(config)
+        })
       } catch (err) {
         $('.j-config').val(defaultConfig)
+        $('.j-head-config').val(defaultHeadConfig)
+        $('.j-footer-config').val(defaultFooterConfig)
       }
     })
   } catch (err) {
