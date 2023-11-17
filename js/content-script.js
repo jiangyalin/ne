@@ -104,6 +104,7 @@ const getParameterV2 = (data, schemas) => {
 }
 
 let apiList = []
+let tsList = []
 
 const defaultConfig = `/**
  * @description <summary>
@@ -224,6 +225,65 @@ const swaggerToTS = (tree = [], data = '') => {
   return data
 }
 
+const schemasToInterface = (schemas, data = []) => {
+  if (schemas.type === 'object') {
+    for (const _key in schemas.properties) {
+      const node = schemas.properties[_key]
+      const type = node.type || ''
+      const description = node.description || ''
+      const enumList = node.enum || []
+
+      if (type === 'boolean') {
+        data.push({ key: _key, type: 'boolean', description, enumList })
+      }
+      if (type === 'integer') {
+        data.push({ key: _key, type: 'number', description, enumList })
+      }
+      if (type === 'string') {
+        data.push({ key: _key, type: 'string', description, enumList })
+      }
+      if (!type && !node.$ref) {
+        data.push({ key: _key, type: 'any', description, enumList })
+      }
+      if (node.$ref) {
+        data.push({ key: _key, type: 'interface', children: getAnchors(node.$ref),  description, enumList })
+      }
+
+      if (type === 'array') {
+        data.push({ key: _key, type: 'interface[]', children: getAnchors(node.items.$ref), description, enumList })
+      }
+    }
+  } else if (schemas.enum) {
+    data.push({ key: '', type: 'enum', description: schemas.description, enumList: schemas.enum })
+  }
+
+  return data
+}
+
+const arrInterfaceToCodeInterface = (arrInterface, name, data = '') => {
+  if (arrInterface.length === 1) {
+    const item = arrInterface[0]
+    if (item.description) data += `/** ${item.description} */\n`
+    data += `export type ${name} = ${item.enumList.join(' | ')}\n`
+    return data
+  }
+  data += `export interface ${name} {\n`
+  arrInterface.forEach(item => {
+    if (item.description) data += `/** ${item.description} */\n`
+    if (item.type === 'interface') {
+      data += `${item.key}: ${item.children},\n`
+    } else if (item.type === 'interface[]') {
+      data += `${item.key}: ${item.children}[],\n`
+    } else {
+      data += `${item.key}: ${item.type},\n`
+    }
+  })
+
+  data += `}\n`
+
+  return data
+}
+
 const start = () => {
   const isSwaggerV1_0_0 = Boolean(document.querySelector('#swagger-ui'))
   const isSwaggerV2_0 = Boolean(document.querySelector('.swagger-section'))
@@ -297,6 +357,12 @@ const start = () => {
         }
       }
 
+      tsList = []
+      for (const key in res.components.schemas) {
+        const item = res.components.schemas[key]
+        tsList.push(arrInterfaceToCodeInterface(schemasToInterface(item), key))
+      }
+
       let tags = []
 
       if (isSwaggerV1_0_0) tags = res.tags.map(item => ({ id: 'operations-tag-' + item.name, tag: item.name }))
@@ -315,6 +381,12 @@ const start = () => {
           $('#' + item.id)
             .parents('.opblock-tag-section').attr('style', 'position: relative')
             .prepend('<button style="width: 60px;position: absolute;top: 24px;left: -60px;" class="j-btn-down" type="button" data-tag="' + item.tag +'">下载</button>')
+        })
+        // 生成ts下载按钮
+        tags.forEach(item => {
+          $('#' + item.id)
+            .parents('.opblock-tag-section').attr('style', 'position: relative')
+            .prepend('<button style="width: 60px;position: absolute;top: 50px;left: -60px;" class="j-ts-btn-down" type="button" data-tag="' + item.tag +'">ts</button>')
         })
       }
       if (isSwaggerV2_0) {
@@ -400,6 +472,14 @@ const init = () => {
     const tag = $(this).attr('data-tag')
     const code = (headConfigMap[window.location.host] || defaultHeadConfig) + '\n' + apiList.filter(item => item.tag === tag).map(item => item.code).join('\n\n') + '\n\n' + (footerConfigMap[window.location.host] || defaultFooterConfig)
     funDownload(code, tag + '.js')
+  })
+
+  // ts
+  $('body').on('click', '.j-ts-btn-down', function (event) {
+    event.preventDefault()
+    const tag = $(this).attr('data-tag')
+    const code = tsList.join('\n')
+    funDownload(code, tag + '.ts')
   })
   
   $('body').on('change', '#select', function () {
