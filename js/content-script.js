@@ -124,6 +124,106 @@ let configMap = {}
 let headConfigMap = {}
 let footerConfigMap = {}
 
+const getAnchors = (path = '') => path.substring(path.lastIndexOf('/') + 1)
+
+// 根据后端类型树生产ts类型接口
+const findTs = (tree, anchors, data = []) => {
+  const _anchors = getAnchors(anchors)
+  for (const key in tree) {
+    const item = tree[key]
+    if (key === _anchors) {
+      if (item.type === 'object') {
+        for (const _key in item.properties) {
+          const node = item.properties[_key]
+          const type = node.type || ''
+          const description = node.description || ''
+          const enumList = node.enum || []
+
+          if (type === 'boolean') {
+            data.push({ key: _key, type: 'boolean', description, enumList })
+          }
+          if (type === 'integer') {
+            data.push({ key: _key, type: 'number', description, enumList })
+          }
+          if (type === 'string') {
+            data.push({ key: _key, type: 'string', description, enumList })
+          }
+          if (!type && !node.$ref) {
+            data.push({ key: _key, type: 'any', description, enumList })
+          }
+          if (node.$ref) {
+            const children = findTs(tree, node.$ref)
+            if (children.length === 1) {
+              data.push({ ...children[0], key: _key })
+            } else {
+              data.push({ key: _key, type: 'any', description, children, enumList })
+            }
+          }
+
+          if (type === 'array') {
+            const children = findTs(tree, node.items.$ref)
+            data.push({ key: _key, type: 'any[]', description, children, enumList })
+          }
+        }
+      }
+
+      if (item.type === 'boolean') {
+        data.push({ key, type: 'boolean', description: item.description, enumList: item.enum || [] })
+      }
+      if (item.type === 'integer') {
+        data.push({ key, type: 'number', description: item.description, enumList: item.enum || [] })
+      }
+      if (item.type === 'string') {
+        data.push({ key, type: 'string', description: item.description, enumList: item.enum || [] })
+      }
+      if (!item.type && !item.$ref) {
+        data.push({ key, type: 'any', description: item.description, enumList: item.enum || [] })
+      }
+      if (item.$ref) {
+        const children = findTs(tree, item.$ref)
+        if (children.length === 1) {
+          data.push({ ...children[0], key })
+        } else {
+          data.push({ key, type: 'any', description: item.description, children, enumList: item.enum || [] })
+        }
+      }
+
+      if (item.type === 'array') {
+        const children = findTs(tree, item.items.$ref)
+        data.push({ key, type: 'any[]', description: item.description, children, enumList: item.enum || [] })
+      }
+    }
+  }
+
+  return data
+}
+
+const swaggerToTS = (tree = [], data = '') => {
+  tree.forEach(item => {
+    if (!item.children) {
+      if (item.description) data += `/** ${item.description} */\n`
+      if (item.enumList.length) {
+        data += `${item.key}: ${item.enumList.join(' | ')},\n`
+      } else {
+        data += `${item.key}: ${item.type},\n`
+      }
+    }
+    if (item.children) {
+      if (item.description) data += `/** ${item.description} */\n`
+      if (item.type === 'any[]') {
+        data += `${item.key}: Array<{\n`
+        data += `${swaggerToTS(item.children)}`
+        data += `}>\n`
+      } else {
+        data += `${item.key}: {\n`
+        data += `${swaggerToTS(item.children)}`
+        data += `}\n`
+      }
+    }
+  })
+  return data
+}
+
 const start = () => {
   const isSwaggerV1_0_0 = Boolean(document.querySelector('#swagger-ui'))
   const isSwaggerV2_0 = Boolean(document.querySelector('.swagger-section'))
@@ -154,6 +254,21 @@ const start = () => {
 
           const requestBody = '{\n' + requestBodyArr.join('\n') + '\n}'
 
+          // 接口返回参数的ts类型
+          let returnTs = ''
+          if (item.responses['200']) {
+            if (item.responses['200']?.content) {
+              if (item.responses['200'].content['application/json']) {
+                if (item.responses['200'].content['application/json'].schema) {
+                  if (item.responses['200'].content['application/json'].schema.$ref) {
+                    const content = swaggerToTS(findTs(res.components.schemas, item.responses['200'].content['application/json'].schema.$ref))
+                    returnTs = `${content}`
+                  }
+                }
+              }
+            }
+          }
+
           const path = key
 
           const summary = item.summary
@@ -176,7 +291,8 @@ const start = () => {
             path,
             requestBody,
             request,
-            summary
+            summary,
+            returnTs
           })
         }
       }
@@ -242,6 +358,8 @@ const init = () => {
         const dom = $('#' + item.id + ' .opblock-summary')
         if (dom) dom.append('<button class="j-btn-copy" type="button" data-id="' + item.id +'">复制</button>')
         if (dom) dom.append('<button class="j-btn-pass-parameters" type="button" data-id="' + item.id +'">传参</button>')
+        if (dom) dom.append('<button class="j-btn-pass-parameters-type" type="button" data-id="' + item.id +'">传参TS</button>')
+        if (dom) dom.append('<button class="j-btn-return-parameters-type" type="button" data-id="' + item.id +'">返参TS</button>')
       })
     }, 300)
   })
@@ -263,6 +381,16 @@ const init = () => {
     $(this).text('ok')
     setTimeout(() => {
       $(this).text('传参')
+    }, 600)
+  })
+
+  // 返回参数类型(返参TS)
+  $('body').on('click', '.j-btn-return-parameters-type', function () {
+    const api = apiList.find(item => item.id === $(this).attr('data-id'))
+    copyToClipboard(api.returnTs)
+    $(this).text('ok')
+    setTimeout(() => {
+      $(this).text('返参TS')
     }, 600)
   })
 
