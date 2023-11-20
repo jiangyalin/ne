@@ -127,104 +127,6 @@ let footerConfigMap = {}
 
 const getAnchors = (path = '') => path.substring(path.lastIndexOf('/') + 1)
 
-// 根据后端类型树生产ts类型接口
-const findTs = (tree, anchors, data = []) => {
-  const _anchors = getAnchors(anchors)
-  for (const key in tree) {
-    const item = tree[key]
-    if (key === _anchors) {
-      if (item.type === 'object') {
-        for (const _key in item.properties) {
-          const node = item.properties[_key]
-          const type = node.type || ''
-          const description = node.description || ''
-          const enumList = node.enum || []
-
-          if (type === 'boolean') {
-            data.push({ key: _key, type: 'boolean', description, enumList })
-          }
-          if (type === 'integer') {
-            data.push({ key: _key, type: 'number', description, enumList })
-          }
-          if (type === 'string') {
-            data.push({ key: _key, type: 'string', description, enumList })
-          }
-          if (!type && !node.$ref) {
-            data.push({ key: _key, type: 'any', description, enumList })
-          }
-          if (node.$ref) {
-            const children = findTs(tree, node.$ref)
-            if (children.length === 1) {
-              data.push({ ...children[0], key: _key })
-            } else {
-              data.push({ key: _key, type: 'any', description, children, enumList })
-            }
-          }
-
-          if (type === 'array') {
-            const children = findTs(tree, node.items.$ref)
-            data.push({ key: _key, type: 'any[]', description, children, enumList })
-          }
-        }
-      }
-
-      if (item.type === 'boolean') {
-        data.push({ key, type: 'boolean', description: item.description, enumList: item.enum || [] })
-      }
-      if (item.type === 'integer') {
-        data.push({ key, type: 'number', description: item.description, enumList: item.enum || [] })
-      }
-      if (item.type === 'string') {
-        data.push({ key, type: 'string', description: item.description, enumList: item.enum || [] })
-      }
-      if (!item.type && !item.$ref) {
-        data.push({ key, type: 'any', description: item.description, enumList: item.enum || [] })
-      }
-      if (item.$ref) {
-        const children = findTs(tree, item.$ref)
-        if (children.length === 1) {
-          data.push({ ...children[0], key })
-        } else {
-          data.push({ key, type: 'any', description: item.description, children, enumList: item.enum || [] })
-        }
-      }
-
-      if (item.type === 'array') {
-        const children = findTs(tree, item.items.$ref)
-        data.push({ key, type: 'any[]', description: item.description, children, enumList: item.enum || [] })
-      }
-    }
-  }
-
-  return data
-}
-
-const swaggerToTS = (tree = [], data = '') => {
-  tree.forEach(item => {
-    if (!item.children) {
-      if (item.description) data += `/** ${item.description} */\n`
-      if (item.enumList.length) {
-        data += `${item.key}: ${item.enumList.join(' | ')},\n`
-      } else {
-        data += `${item.key}: ${item.type},\n`
-      }
-    }
-    if (item.children) {
-      if (item.description) data += `/** ${item.description} */\n`
-      if (item.type === 'any[]') {
-        data += `${item.key}: Array<{\n`
-        data += `${swaggerToTS(item.children)}`
-        data += `}>\n`
-      } else {
-        data += `${item.key}: {\n`
-        data += `${swaggerToTS(item.children)}`
-        data += `}\n`
-      }
-    }
-  })
-  return data
-}
-
 const schemasToInterface = (schemas, data = []) => {
   if (schemas.type === 'object') {
     for (const _key in schemas.properties) {
@@ -236,8 +138,11 @@ const schemasToInterface = (schemas, data = []) => {
       if (type === 'boolean') {
         data.push({ key: _key, type: 'boolean', description, enumList })
       }
-      if (type === 'integer') {
+      if ((type === 'integer' && node.format === 'int32') || type === 'number') {
         data.push({ key: _key, type: 'number', description, enumList })
+      }
+      if (type === 'integer' && node.format === 'int64') {
+        data.push({ key: _key, type: 'string', description, enumList })
       }
       if (type === 'string') {
         data.push({ key: _key, type: 'string', description, enumList })
@@ -321,8 +226,23 @@ const start = () => {
               if (item.responses['200'].content['application/json']) {
                 if (item.responses['200'].content['application/json'].schema) {
                   if (item.responses['200'].content['application/json'].schema.$ref) {
-                    const content = swaggerToTS(findTs(res.components.schemas, item.responses['200'].content['application/json'].schema.$ref))
-                    returnTs = `${content}`
+                    const anchors = getAnchors(item.responses['200'].content['application/json'].schema.$ref)
+                    returnTs = `export interface ${apiName}ResType extends ${anchors} {}`
+                  }
+                }
+              }
+            }
+          }
+
+          // 传参的ts类型
+          let parameterTs = ''
+          if (item.requestBody) {
+            if (item.requestBody.content) {
+              if (item.requestBody.content['text/json']) {
+                if (item.requestBody.content['text/json'].schema) {
+                  if (item.requestBody.content['text/json'].schema.$ref) {
+                    const anchors = getAnchors(item.requestBody.content['text/json'].schema.$ref)
+                    parameterTs = `export interface ${apiName}ReqType extends ${anchors} {}`
                   }
                 }
               }
@@ -352,7 +272,8 @@ const start = () => {
             requestBody,
             request,
             summary,
-            returnTs
+            returnTs,
+            parameterTs
           })
         }
       }
@@ -463,6 +384,16 @@ const init = () => {
     $(this).text('ok')
     setTimeout(() => {
       $(this).text('返参TS')
+    }, 600)
+  })
+
+  // 传参类型(传参TS)
+  $('body').on('click', '.j-btn-pass-parameters-type', function () {
+    const api = apiList.find(item => item.id === $(this).attr('data-id'))
+    copyToClipboard(api.parameterTs)
+    $(this).text('ok')
+    setTimeout(() => {
+      $(this).text('传参TS')
     }, 600)
   })
 
