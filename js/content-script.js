@@ -134,28 +134,36 @@ const schemasToInterface = (schemas, data = []) => {
       const type = node.type || ''
       const description = node.description || ''
       const enumList = node.enum || []
+      const required = (schemas.required || []).includes(_key)
 
       if (type === 'boolean') {
-        data.push({ key: _key, type: 'boolean', description, enumList })
+        data.push({ key: _key, type: 'boolean', description, enumList, required })
       }
       if ((type === 'integer' && node.format === 'int32') || type === 'number') {
-        data.push({ key: _key, type: 'number', description, enumList })
+        data.push({ key: _key, type: 'number', description, enumList, required })
       }
       if (type === 'integer' && node.format === 'int64') {
-        data.push({ key: _key, type: 'string', description, enumList })
+        data.push({ key: _key, type: 'string', description, enumList, required })
       }
       if (type === 'string') {
-        data.push({ key: _key, type: 'string', description, enumList })
+        data.push({ key: _key, type: 'string', description, enumList, required })
       }
       if (!type && !node.$ref) {
-        data.push({ key: _key, type: 'any', description, enumList })
+        data.push({ key: _key, type: 'any', description, enumList, required })
       }
       if (node.$ref) {
-        data.push({ key: _key, type: 'interface', children: getAnchors(node.$ref),  description, enumList })
+        data.push({ key: _key, type: 'interface', children: getAnchors(node.$ref),  description, enumList, required })
       }
 
       if (type === 'array') {
-        data.push({ key: _key, type: 'interface[]', children: getAnchors(node.items.$ref), description, enumList })
+        if (node.items.$ref) {
+          data.push({ key: _key, type: 'interface[]', children: getAnchors(node.items.$ref), description, enumList, required })
+        } else {
+          let _type = node.items.type
+          if (node.items.type === 'integer' && node.items.format === 'int32') _type = 'number'
+          if (node.items.type === 'integer' && node.items.format === 'int64') _type = 'string'
+          data.push({ key: _key, type: _type + '[]', description, enumList, required })
+        }
       }
     }
   } else if (schemas.enum) {
@@ -168,19 +176,29 @@ const schemasToInterface = (schemas, data = []) => {
 const arrInterfaceToCodeInterface = (arrInterface, name, data = '') => {
   if (arrInterface.length === 1) {
     const item = arrInterface[0]
-    if (item.description) data += `/** ${item.description} */\n`
-    data += `export type ${name} = ${item.enumList.join(' | ')}\n`
-    return data
+    // let type = item.type
+    if ((item.enumList || []).length) {
+      if (item.description) data += `/** ${item.description} */\n`
+      data += `export type ${name} = ${item.enumList.join(' | ')}\n`
+      return data
+    }
   }
   data += `export interface ${name} {\n`
   arrInterface.forEach(item => {
     if (item.description) data += `/** ${item.description} */\n`
     if (item.type === 'interface') {
-      data += `${item.key}: ${item.children},\n`
+      const _type = item.children
+      const nullCode = (item.key === 'id' || !item.required) && (_type === 'string' || _type === 'number') ? ' | null': ''
+      const requiredCode = !item.required && (_type === 'string' || _type === 'number' || _type === 'boolean') ? '?' : ''
+      data += `${item.key}${requiredCode}: ${_type}${nullCode},\n`
     } else if (item.type === 'interface[]') {
-      data += `${item.key}: ${item.children}[],\n`
+      const _type = (item.children || 'any') + '[]'
+      data += `${item.key}${item.required ? '' : '?'}: ${_type},\n`
     } else {
-      data += `${item.key}: ${item.type},\n`
+      const _type = item.type
+      const nullCode = (item.key === 'id' || !item.required) && (_type === 'string' || _type === 'number') ? ' | null': ''
+      const requiredCode = !item.required && (_type === 'string' || _type === 'number' || _type === 'boolean') ? '?' : ''
+      data += `${item.key}${requiredCode}: ${_type}${nullCode},\n`
     }
   })
 
