@@ -12,8 +12,18 @@ export const <method><apiName> = data => {
 }`
 const defaultHeadConfig = `import { axios } from '@/utils/request'`
 const defaultFooterConfig = ``
+const defaultCheckboxConfig = false
 
 let url = ''
+document.querySelector('#checkboxTs').addEventListener('change',()=>{
+  chrome.storage.local.get('checkConfigMap', res => {
+    const checkConfigMap = res.checkConfigMap || {}
+    checkConfigMap[url] = $('#checkboxTs').prop('checked')
+    console.log(checkConfigMap)
+    chrome.storage.local.set({ checkConfigMap: checkConfigMap })
+  })
+  
+})
 
 // 保存
 $('.j-config-save').click(function () {
@@ -27,6 +37,14 @@ $('.j-config-save').click(function () {
     headConfigMap[url] = $('.j-head-config').val()
     chrome.storage.local.set({ headConfigMap: headConfigMap })
   })
+
+  chrome.storage.local.get('checkConfigMap', res => {
+    const checkConfigMap = res.checkConfigMap || {}
+    checkConfigMap[url] = $('#checkboxTs').prop('checked')
+    console.log(checkConfigMap)
+    chrome.storage.local.set({ checkConfigMap: checkConfigMap })
+  })
+
   chrome.storage.local.get('footerConfigMap', res => {
     const footerConfigMap = res.footerConfigMap || {}
     footerConfigMap[url] = $('.j-footer-config').val()
@@ -67,6 +85,11 @@ const init = () => {
           const config = (res.configMap || {})[url] || defaultConfig
           $('.j-config').val(config)
         })
+        chrome.storage.local.get('checkConfigMap', res => {
+          const config = (res.checkConfigMap || {})[url] || defaultCheckboxConfig
+          console.log(config);
+          $('#checkboxTs').prop('checked', config);
+        })
         chrome.storage.local.get('headConfigMap', res => {
           const config = (res.headConfigMap || {})[url] || defaultHeadConfig
           $('.j-head-config').val(config)
@@ -78,6 +101,7 @@ const init = () => {
       } catch (err) {
         $('.j-config').val(defaultConfig)
         $('.j-head-config').val(defaultHeadConfig)
+        $('#checkboxTs').val(defaultCheckboxConfig)
         $('.j-footer-config').val(defaultFooterConfig)
       }
     })
